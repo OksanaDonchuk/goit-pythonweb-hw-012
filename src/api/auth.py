@@ -39,7 +39,11 @@ async def register(
 ):
     user = await auth_service.register_user(user_data)
     background_tasks.add_task(
-        send_email, user_data.email, user_data.username, str(request.base_url)
+        send_email,
+        user_data.email,
+        user_data.username,
+        str(request.base_url),
+        type_email="confirm_email",
     )
     return user
 

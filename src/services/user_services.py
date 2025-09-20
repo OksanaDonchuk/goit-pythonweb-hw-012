@@ -39,34 +39,20 @@ class UserService:
     async def update_avatar_url(self, email: str, url: str):
         return await self.user_repository.update_avatar_url(email, url)
 
-    async def request_password_reset(self, email: str, host: str):
+    async def reset_password(self, token: str, new_password: str) -> dict:
         """
-        Створює токен для скидання паролю та надсилає email користувачу.
-        """
-        user = await self.user_repository.get_user_by_email(email)
-        if not user:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=messages.user_not_found,
-            )
+        Скидає пароль користувача за валідним токеном.
 
-        # Створюємо токен (на основі email)
-        token = create_email_token({"sub": user.email})
+        1) Розкодовує токен та дістає email.
+        2) Перевіряє існування користувача.
+        3) Хешує новий пароль та оновлює у БД через репозиторій.
 
-        # Відправляємо лист
-        await send_email(
-            email=user.email,
-            username=user.username,
-            host=host,
-            type_email="reset_password",
-            token=token,
-        )
+        Raises:
+            HTTPException(404): Якщо користувача не знайдено.
+            HTTPException(422): Якщо токен невалідний (піднімається у get_email_from_token).
 
-        return {"message": messages.password_reset_email_sent}
-
-    async def reset_password(self, token: str, new_password: str):
-        """
-        Скидання пароля користувача за токеном.
+        Returns:
+            dict: Повідомлення про успіх.
         """
         email = get_email_from_token(token)
         user = await self.user_repository.get_user_by_email(email)
@@ -76,7 +62,7 @@ class UserService:
                 detail=messages.user_not_found,
             )
 
-        hashed_password = self.auth_service._hash_password(new_password)
-        await self.user_repository.update_password(email, hashed_password)
+        hashed = self.auth_service._hash_password(new_password)
+        await self.user_repository.update_password(email, hashed)
 
         return {"message": messages.password_reset_success}

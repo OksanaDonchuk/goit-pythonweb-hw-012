@@ -100,27 +100,35 @@ async def update_avatar_user(
 @router.post("/request_password_reset")
 async def request_password_reset(
     body: ResetPasswordRequestSchema,
+    background_tasks: BackgroundTasks,
     request: Request,
     user_service: UserService = Depends(get_user_service),
 ):
     """
-    Надсилає користувачу email з токеном для скидання паролю.
+    Ставитиме у фон завдання на відправку листа зі скиданням паролю.
+
+    Токен створюється всередині send_email (type_email="reset_password").
+    Повертаємо однакове повідомлення, аби не розкривати існування email.
     """
-    result = await user_service.request_password_reset(
-        body.email, str(request.base_url)
-    )
-    return result
+    user = await user_service.get_user_by_email(str(body.email))
+    if user:
+        background_tasks.add_task(
+            send_email,
+            email=user.email,
+            username=user.username,
+            host=str(request.base_url),
+            type_email="reset_password",
+        )
+
+    return {"message": messages.password_reset_email_sent}
 
 
-@router.post("/reset_password/{token}")
+@router.post("/reset_password")
 async def reset_password(
-    token: str,
     body: ResetPasswordSchema,
-    request: Request,
     user_service: UserService = Depends(get_user_service),
 ):
     """
-    Використовує токен для скидання паролю користувача.
+    Приймає токен та новий пароль, скидає пароль користувача.
     """
-    result = await user_service.reset_password(token, body.new_password)
-    return result
+    return await user_service.reset_password(body.token, body.new_password)
