@@ -2,12 +2,11 @@ from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.conf import messages
-from src.core.email_token import get_email_from_token, create_email_token
+from src.core.email_token import get_email_from_token
 from src.entity.models import User
 from src.repositories.user_repository import UserRepository
 from src.schemas.user_schema import UserCreate
 from src.services.auth_services import AuthService
-from src.services.email_services import send_email
 
 
 class UserService:

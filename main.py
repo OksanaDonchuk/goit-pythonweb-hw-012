@@ -9,6 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 from src.api import contacts, utils, auth, users
+from src.conf import messages
 from src.database.db import sessionmanager
 
 scheduler = AsyncIOScheduler()
@@ -46,7 +47,7 @@ app = FastAPI(
 async def rate_limit_handler(request: Request, exc: RateLimitExceeded):
     return JSONResponse(
         status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-        content={"error": "Перевищено ліміт запитів. Спробуйте пізніше."},
+        content={"error": messages.request_limit},
     )
 
 

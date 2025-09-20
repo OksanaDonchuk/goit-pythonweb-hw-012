@@ -167,7 +167,7 @@ async def update_contact(
         if exists_conflict:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
-                detail="Інший контакт вже має цей email або телефон",
+                detail=messages.email_tel_exists,
             )
 
     contact = await service.update_contact(contact_id, body, user)

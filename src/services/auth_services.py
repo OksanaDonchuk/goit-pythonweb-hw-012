@@ -1,3 +1,4 @@
+import json
 from datetime import datetime, timedelta, timezone
 import secrets
 
@@ -15,8 +16,7 @@ from src.conf import messages
 from src.entity.models import User
 from src.repositories.refresh_token_repository import RefreshTokenRepository
 from src.repositories.user_repository import UserRepository
-from src.schemas.user_schema import UserCreate
-
+from src.schemas.user_schema import UserCreate, UserResponse
 
 redis_client = redis.from_url(settings.REDIS_URL)
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
@@ -56,7 +56,7 @@ class AuthService:
         if not user.confirmed:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Електронна адреса не підтверджена",
+                detail=messages.email_not_confirm,
             )
 
         if not self._verify_password(password, user.hash_password):
@@ -132,8 +132,9 @@ class AuthService:
                 detail=messages.invalid_token,
             )
 
-    async def get_current_user(self, token: str = Depends(oauth2_scheme)) -> User:
-
+    async def get_current_user(
+        self, token: str = Depends(oauth2_scheme)
+    ) -> UserResponse:
         if await redis_client.exists(f"bl:{token}"):
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
@@ -147,13 +148,22 @@ class AuthService:
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail=messages.validate_credentials,
             )
+
+        cached_user = await redis_client.get(f"user:{username}")
+        if cached_user:
+            return UserResponse(**json.loads(cached_user))
+
         user = await self.user_repository.get_by_username(username)
-        if user is None:
+        if not user:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail=messages.validate_credentials,
             )
-        return user
+
+        user_data = UserResponse.model_validate(user).model_dump()
+        await redis_client.setex(f"user:{username}", 5, json.dumps(user_data))
+
+        return UserResponse(**user_data)
 
     async def validate_refresh_token(self, token: str) -> User:
 

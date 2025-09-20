@@ -76,7 +76,13 @@ async def login(
 @router.post(
     "/refresh", response_model=TokenResponse, status_code=status.HTTP_201_CREATED
 )
-@router.post("/refresh", response_model=TokenResponse)
+@router.post(
+    "/refresh",
+    response_model=TokenResponse,
+    name="Оновлення токена",
+    description="Приймає refresh-токен і видає нову пару токенів: access та refresh.",
+    response_description="JSON з новим access-токеном та новим refresh-токеном.",
+)
 async def refresh(
     refresh_token: RefreshTokenRequest,
     request: Request = None,
@@ -100,7 +106,13 @@ async def refresh(
     )
 
 
-@router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
+@router.post(
+    "/logout",
+    status_code=status.HTTP_204_NO_CONTENT,
+    name="Вихід користувача із системи",
+    description="Здійснює вихід користувача з системи. Access- і refresh-токени відкликаються та стають недійсними.",
+    response_description="Повертає 204 No Content у випадку успішного виходу.",
+)
 async def logout(
     refresh_token: RefreshTokenRequest,
     token: str = Depends(oauth2_scheme),
