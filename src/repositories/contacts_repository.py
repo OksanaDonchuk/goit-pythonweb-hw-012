@@ -8,10 +8,33 @@ from src.schemas.contacts_schema import ContactSchema, ContactUpdateSchema
 
 
 class ContactRepository:
+    """
+    Репозиторій для роботи з контактами.
+
+    Інкапсулює CRUD-операції та додаткові методи пошуку / перевірки унікальності
+    для моделі :class:`Contact`.
+    """
+
     def __init__(self, session: AsyncSession):
+        """
+        Ініціалізація репозиторію.
+
+        Args:
+            session (AsyncSession): Асинхронна сесія SQLAlchemy.
+        """
         self.db = session
 
     async def create_contact(self, body: ContactSchema, user: User) -> Contact:
+        """
+        Створює новий контакт, прив’язаний до користувача.
+
+        Args:
+            body (ContactSchema): Дані нового контакту.
+            user (User): Користувач, власник контакту.
+
+        Returns:
+            Contact: Створений контакт.
+        """
         contact = Contact(**body.model_dump(), user=user)
         self.db.add(contact)
         await self.db.commit()
@@ -21,6 +44,17 @@ class ContactRepository:
     async def get_all_contacts(
         self, user: User, limit: int = 100, offset: int = 0
     ) -> Sequence[Contact]:
+        """
+        Отримати список контактів користувача з пагінацією.
+
+        Args:
+            user (User): Власник контактів.
+            limit (int): Максимальна кількість результатів (default=100).
+            offset (int): Зсув від початку вибірки (default=0).
+
+        Returns:
+            Sequence[Contact]: Список контактів.
+        """
         stmt = (
             select(Contact)
             .filter_by(user_id=user.id)
@@ -32,6 +66,16 @@ class ContactRepository:
         return res.scalars().all()
 
     async def get_contact_by_id(self, contact_id: int, user: User) -> Contact | None:
+        """
+        Отримати контакт за його ID (якщо належить користувачу).
+
+        Args:
+            contact_id (int): Ідентифікатор контакту.
+            user (User): Власник контактів.
+
+        Returns:
+            Contact | None: Контакт або None, якщо не знайдено.
+        """
         stmt = select(Contact).filter_by(id=contact_id, user_id=user.id)
         res = await self.db.execute(stmt)
         return res.scalar_one_or_none()
@@ -39,6 +83,17 @@ class ContactRepository:
     async def update_contact(
         self, contact_id: int, body: ContactUpdateSchema, user: User
     ) -> Contact | None:
+        """
+        Оновлює дані контакту.
+
+        Args:
+            contact_id (int): Ідентифікатор контакту.
+            body (ContactUpdateSchema): Дані для оновлення.
+            user (User): Власник контактів.
+
+        Returns:
+            Contact | None: Оновлений контакт або None, якщо не знайдено.
+        """
         contact = await self.get_contact_by_id(contact_id, user)
         if not contact:
             return None
@@ -52,6 +107,16 @@ class ContactRepository:
         return contact
 
     async def remove_contact(self, contact_id: int, user: User) -> Contact | None:
+        """
+        Видаляє контакт за ID.
+
+        Args:
+            contact_id (int): Ідентифікатор контакту.
+            user (User): Власник контактів.
+
+        Returns:
+            Contact | None: Видалений контакт або None, якщо не знайдено.
+        """
         contact = await self.get_contact_by_id(contact_id, user)
         if not contact:
             return None
@@ -63,6 +128,18 @@ class ContactRepository:
     async def get_contact_by_query(
         self, query: str, user: User, *, limit: int = 100, offset: int = 0
     ) -> Sequence[Contact]:
+        """
+        Пошук контактів за ім’ям, прізвищем або email (ILike).
+
+        Args:
+            query (str): Рядок пошуку.
+            user (User): Власник контактів.
+            limit (int): Максимальна кількість результатів.
+            offset (int): Зсув від початку.
+
+        Returns:
+            Sequence[Contact]: Список знайдених контактів (може бути порожнім).
+        """
         if not query:
             return []
         stmt = (
@@ -86,8 +163,14 @@ class ContactRepository:
         self, user: User, days: int = 7
     ) -> Sequence[Contact]:
         """
-        Контакти, в яких день народження у найближчі `days` днів (включно з сьогодні).
-        Враховує різні роки
+        Отримати контакти, у яких день народження у найближчі `days` днів.
+
+        Args:
+            user (User): Власник контактів.
+            days (int): Кількість днів наперед (default=7).
+
+        Returns:
+            Sequence[Contact]: Список контактів, відсортованих за датою ДН.
         """
         year = cast(func.extract("year", func.current_date()), Integer)
         month = cast(func.extract("month", Contact.birthday), Integer)
@@ -123,14 +206,15 @@ class ContactRepository:
         self, email: str, phone: str, user: User
     ) -> Contact | None:
         """
-        Повертає контакт, якщо існує збіг за email або телефоном.
+        Знайти контакт користувача за email або телефоном.
 
         Args:
-            email: Електронна пошта для точного порівняння (нормалізована у схемі).
-            phone: Телефон для точного порівняння (нормалізований у схемі).
+            email (str): Email.
+            phone (str): Телефон.
+            user (User): Власник контактів.
 
         Returns:
-            Contact | None: Перший знайдений контакт або None.
+            Contact | None: Знайдений контакт або None.
         """
         stmt = (
             select(Contact)
@@ -149,15 +233,16 @@ class ContactRepository:
         phone: str | None = None,
     ) -> bool:
         """
-        Перевіряє, чи існує інший контакт з таким email або телефоном.
+        Перевірити унікальність email/телефону під час оновлення контакту.
 
         Args:
-            contact_id: ID контакту, якого оновлюємо (виключається з перевірки).
-            email: Новий email (може бути None, якщо не оновлюється).
-            phone: Новий телефон (може бути None, якщо не оновлюється).
+            user (User): Власник контактів.
+            contact_id (int): ID контакту, що оновлюється (виключається з перевірки).
+            email (str | None): Новий email.
+            phone (str | None): Новий телефон.
 
         Returns:
-            bool: True, якщо знайдено інший контакт з таким email або телефоном.
+            bool: True, якщо існує інший контакт з таким email/телефоном.
         """
         stmt = (
             select(Contact).filter_by(user_id=user.id).where(Contact.id != contact_id)

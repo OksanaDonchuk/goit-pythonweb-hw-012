@@ -20,6 +20,15 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 
 
 def get_auth_service(db: AsyncSession = Depends(get_db)):
+    """
+    Залежність для отримання екземпляра AuthService.
+
+    Args:
+        db (AsyncSession): Асинхронна сесія SQLAlchemy.
+
+    Returns:
+        AuthService: Сервіс для роботи з аутентифікацією.
+    """
     return AuthService(db)
 
 
@@ -37,6 +46,18 @@ async def register(
     request: Request,
     auth_service: AuthService = Depends(get_auth_service),
 ):
+    """
+    Реєстрація нового користувача.
+
+    Args:
+        user_data (UserCreate): Дані нового користувача (username, email, пароль).
+        background_tasks (BackgroundTasks): Завдання у фон для відправки листа підтвердження.
+        request (Request): Поточний HTTP-запит.
+        auth_service (AuthService): Сервіс аутентифікації.
+
+    Returns:
+        UserResponse: Дані зареєстрованого користувача.
+    """
     user = await auth_service.register_user(user_data)
     background_tasks.add_task(
         send_email,
@@ -61,6 +82,17 @@ async def login(
     request: Request = None,
     auth_service: AuthService = Depends(get_auth_service),
 ):
+    """
+    Вхід користувача в систему.
+
+    Args:
+        form_data (OAuth2PasswordRequestForm): Дані для входу (username і пароль).
+        request (Request, optional): Поточний HTTP-запит.
+        auth_service (AuthService): Сервіс аутентифікації.
+
+    Returns:
+        TokenResponse: Пара токенів (access та refresh).
+    """
     user = await auth_service.authenticate(form_data.username, form_data.password)
     access_token = auth_service.create_access_token(user.username)
     refresh_token = await auth_service.create_refresh_token(
@@ -74,9 +106,6 @@ async def login(
 
 
 @router.post(
-    "/refresh", response_model=TokenResponse, status_code=status.HTTP_201_CREATED
-)
-@router.post(
     "/refresh",
     response_model=TokenResponse,
     name="Оновлення токена",
@@ -88,6 +117,17 @@ async def refresh(
     request: Request = None,
     auth_service: AuthService = Depends(get_auth_service),
 ):
+    """
+    Оновлення токенів користувача.
+
+    Args:
+        refresh_token (RefreshTokenRequest): Дійсний refresh-токен.
+        request (Request, optional): Поточний HTTP-запит.
+        auth_service (AuthService): Сервіс аутентифікації.
+
+    Returns:
+        TokenResponse: Нові access- і refresh-токени.
+    """
     user = await auth_service.validate_refresh_token(refresh_token.refresh_token)
 
     new_access_token = auth_service.create_access_token(user.username)
@@ -118,6 +158,17 @@ async def logout(
     token: str = Depends(oauth2_scheme),
     auth_service: AuthService = Depends(get_auth_service),
 ):
+    """
+    Вихід користувача із системи.
+
+    Args:
+        refresh_token (RefreshTokenRequest): Refresh-токен користувача.
+        token (str): Access-токен користувача.
+        auth_service (AuthService): Сервіс аутентифікації.
+
+    Returns:
+        None: Повертає 204 No Content.
+    """
     await auth_service.revoke_access_token(token)
     await auth_service.revoke_refresh_token(refresh_token.refresh_token)
     return None

@@ -20,10 +20,32 @@ conf = ConnectionConfig(
     VALIDATE_CERTS=settings.VALIDATE_CERTS,
     TEMPLATE_FOLDER=Path(__file__).parent / "templates",
 )
+"""
+Конфігурація для підключення до SMTP-сервера.
+
+Використовується бібліотекою **FastMail** для відправлення листів.
+
+- Береться з `.env` через `settings`.
+- Підтримує TLS/SSL, перевірку сертифікатів та роботу з шаблонами.
+"""
 
 
 async def send_email(email: EmailStr, username: str, host: str, type_email: str):
+    """
+    Надсилає електронний лист користувачу (підтвердження або скидання пароля).
 
+    Args:
+        email (EmailStr): Електронна адреса отримувача.
+        username (str): Ім’я користувача для підстановки в шаблон.
+        host (str): Хост (базовий URL) для побудови посилання.
+        type_email (str): Тип листа. Підтримувані значення:
+            - `"confirm_email"` — лист для підтвердження пошти.
+            - `"reset_password"` — лист для скидання пароля.
+
+    Raises:
+        ValueError: Якщо `type_email` не є підтримуваним.
+        ConnectionErrors: Якщо виникла проблема з підключенням до SMTP.
+    """
     try:
         if type_email == "confirm_email":
             token = create_email_token({"sub": email})

@@ -43,14 +43,23 @@ async def create_contact(
     user: User = Depends(get_current_user),
 ):
     """
-    Створює новий контакт з перевіркою унікальності для авторизованого користувача
+    Створює новий контакт для авторизованого користувача з перевіркою унікальності.
 
-    - Спочатку перевіряємо, чи існує контакт з таким email або телефоном.
-    - Якщо так — 409 CONFLICT.
-    - Якщо ні — створюємо запис.
+    - Перевіряє, чи існує контакт з таким email або телефоном.
+    - Якщо так — повертає 409 CONFLICT.
+    - Якщо ні — створює новий контакт.
 
-    Плюс додаткова «страховка» від конкуренції: ловимо IntegrityError,
-    якщо унікальні індекси БД спрацювали раніше (race condition).
+    Примітка:
+        Може перехопити IntegrityError у випадку race condition,
+        коли перевірка унікальності та вставка відбуваються одночасно.
+
+    Args:
+        body: Дані нового контакту.
+        service: Сервіс контактів (DI).
+        user: Авторизований користувач.
+
+    Returns:
+        ContactResponse: Дані створеного контакту.
     """
     existing = await service.get_by_email_or_phone(str(body.email), body.phone, user)
     if existing:
@@ -79,13 +88,13 @@ async def get_all_contacts(
     Отримує список контактів користувача з пагінацією.
 
     Args:
-        limit: Максимальна кількість записів.
-        offset: Зсув від початку вибірки.
-        service: Сервіс контактів (DI).
-        user: Авторизований користувач - власник контактів.
+        limit (int): Максимальна кількість записів (1–500).
+        offset (int): Зсув від початку вибірки.
+        service (ContactService): Сервіс контактів (DI).
+        user (User): Авторизований користувач — власник контактів.
 
     Returns:
-        list[ContactResponse]: Список контактів (може бути порожнім).
+        list[ContactResponse]: Список контактів користувача.
     """
     return await service.get_all_contacts(user, limit, offset)
 
@@ -253,18 +262,20 @@ async def get_contacts_by_upcoming_birthdays(
     user: User = Depends(get_current_user),
 ):
     """
-    Повертає контакти користувача з днями народження в найближчі `days` днів.
+    Повертає контакти користувача з днями народження у найближчі `days` днів.
 
-    Якщо нічого не знайдено — повертає 200 OK з JSON-об’єктом:
+    Якщо контактів немає — повертає 200 OK із повідомленням
     `{"message": "...", "contacts": []}`.
 
     Args:
-        days: Кількість днів наперед (1–30).
-        service: Сервіс контактів (DI).
-        user: Авторизований користувач - власник контактів
+        days (int): Кількість днів наперед (1–30).
+        service (ContactService): Сервіс контактів (DI).
+        user (User): Авторизований користувач.
 
     Returns:
-        list[ContactResponse] | JSONResponse: Список контактів або повідомлення з порожнім списком.
+        list[ContactResponse] | JSONResponse:
+        - Список контактів, якщо знайдено.
+        - JSON з повідомленням і порожнім списком, якщо ні.
     """
     contacts = await service.get_contacts_by_upcoming_birthdays(user, days=days)
     if not contacts:

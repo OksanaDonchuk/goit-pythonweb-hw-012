@@ -46,6 +46,17 @@ async def me(
     token: str = Depends(oauth2_scheme),
     auth_service: AuthService = Depends(get_auth_service),
 ):
+    """
+    Повертає дані автентифікованого користувача.
+
+    Args:
+        request (Request): Об’єкт запиту FastAPI (для rate limiting).
+        token (str): Access-токен користувача.
+        auth_service (AuthService): Сервіс автентифікації.
+
+    Returns:
+        UserResponse: Поточний користувач із кешу Redis або БД.
+    """
     return await auth_service.get_current_user(token)
 
 
@@ -92,6 +103,18 @@ async def request_email(
     request: Request,
     user_service: UserService = Depends(get_user_service),
 ):
+    """
+    Відправляє повторний лист для підтвердження email.
+
+    Args:
+        body (RequestEmail): Об’єкт зі значенням email користувача.
+        background_tasks (BackgroundTasks): Черга для асинхронної відправки листа.
+        request (Request): Об’єкт запиту FastAPI.
+        user_service (UserService): Сервіс для роботи з користувачами.
+
+    Returns:
+        dict: Повідомлення про статус підтвердження.
+    """
     user = await user_service.get_user_by_email(str(body.email))
 
     if user.confirmed:
@@ -117,6 +140,17 @@ async def update_avatar_user(
     user: User = Depends(get_current_admin_user),
     user_service: UserService = Depends(get_user_service),
 ):
+    """
+    Оновлює аватар користувача у хмарному сервісі.
+
+    Args:
+        file (UploadFile): Файл зображення у форматі multipart/form-data.
+        user (User): Авторизований користувач з роллю admin.
+        user_service (UserService): Сервіс користувачів.
+
+    Returns:
+        UserResponse: Дані користувача з новим URL аватару.
+    """
     avatar_url = UploadFileService(
         settings.CLD_NAME, settings.CLD_API_KEY, settings.CLD_API_SECRET
     ).upload_file(file, user.username)
@@ -143,6 +177,15 @@ async def request_password_reset(
 
     Токен створюється всередині send_email (type_email="reset_password").
     Повертаємо однакове повідомлення, аби не розкривати існування email.
+
+    Args:
+        body (ResetPasswordRequestSchema): Email користувача.
+        background_tasks (BackgroundTasks): Черга для відправки листа.
+        request (Request): Об’єкт запиту FastAPI.
+        user_service (UserService): Сервіс користувачів.
+
+    Returns:
+        dict: Повідомлення про відправку інструкцій.
     """
     user = await user_service.get_user_by_email(str(body.email))
     if user:

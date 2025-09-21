@@ -16,11 +16,14 @@ logger = logging.getLogger("uvicorn.error")
 
 class DatabaseSessionManager:
     """
-    Менеджер для створення асинхронного engine та фабрики сесій SQLAlchemy.
+    Менеджер для роботи з асинхронними сесіями SQLAlchemy.
+
+    Створює engine та фабрику асинхронних сесій, що дозволяє
+    працювати з базою даних у контексті FastAPI.
 
     Args:
-        url (str): Рядок підключення до бази даних у форматі
-            postgresql+asyncpg://user:password@host:port/dbname
+        url (str): Рядок підключення до бази даних у форматі:
+            ``postgresql+asyncpg://user:password@host:port/dbname``.
     """
 
     def __init__(self, url: str):
@@ -37,12 +40,15 @@ class DatabaseSessionManager:
         """
         Асинхронний контекст-менеджер для роботи з базою даних.
 
+        Забезпечує автоматичний rollback у випадку помилок
+        та закриває сесію після завершення роботи.
+
         Yields:
             AsyncSession: Асинхронна сесія SQLAlchemy для виконання запитів.
 
         Raises:
-            SQLAlchemyError: Якщо виникає помилка бази даних.
-            Exception: Для будь-яких інших неочікуваних помилок.
+            SQLAlchemyError: Помилка при роботі з базою даних.
+            Exception: Інші непередбачені помилки.
         """
         session = self._session_maker()
         try:
@@ -65,12 +71,12 @@ sessionmanager = DatabaseSessionManager(settings.DB_URL)
 
 async def get_db():
     """
-    Генератор залежності для FastAPI.
+    Залежність для FastAPI (Depends).
 
-    Використовується у Depends(), щоб передавати асинхронну сесію у роутери.
+    Використовується для отримання асинхронної сесії БД у роутерах та сервісах.
 
     Yields:
-        AsyncSession: Асинхронна сесія SQLAlchemy.
+        AsyncSession: Асинхронна сесія SQLAlchemy для виконання запитів.
     """
     async with sessionmanager.session() as session:
         yield session

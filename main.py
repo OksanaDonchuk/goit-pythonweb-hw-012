@@ -16,6 +16,15 @@ scheduler = AsyncIOScheduler()
 
 
 async def cleanup_expired_tokens():
+    """
+    Видаляє прострочені або відкликані refresh токени з бази даних.
+
+    Токени видаляються, якщо:
+      - їхня дата закінчення (expired_at) менша за поточну дату;
+      - або вони були відкликані (revoked_at не NULL) і минув тиждень з моменту відкликання.
+
+    Після видалення зміни фіксуються в базі.
+    """
     async with sessionmanager.session() as db:
         now = datetime.now(timezone.utc)
         cutoff = now - timedelta(days=7)
@@ -29,6 +38,19 @@ async def cleanup_expired_tokens():
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    """
+    Контекст життєвого циклу FastAPI-додатку.
+
+    Запускає планувальник (`AsyncIOScheduler`) для періодичного
+    видалення прострочених токенів (`cleanup_expired_tokens`).
+    Після завершення роботи додатку — зупиняє планувальник.
+
+    Args:
+        app (FastAPI): Поточний екземпляр FastAPI-додатку.
+
+    Yields:
+        None
+    """
     scheduler.add_job(cleanup_expired_tokens, "interval", hours=1)
     scheduler.start()
     yield
@@ -45,6 +67,16 @@ app = FastAPI(
 
 @app.exception_handler(RateLimitExceeded)
 async def rate_limit_handler(request: Request, exc: RateLimitExceeded):
+    """
+    Обробник винятку перевищення ліміту запитів (429 Too Many Requests).
+
+    Args:
+        request (Request): Поточний HTTP-запит.
+        exc (RateLimitExceeded): Виняток, що піднімається при перевищенні ліміту.
+
+    Returns:
+        JSONResponse: JSON-відповідь з кодом 429 та повідомленням про ліміт.
+    """
     return JSONResponse(
         status_code=status.HTTP_429_TOO_MANY_REQUESTS,
         content={"error": messages.request_limit},
@@ -68,6 +100,18 @@ app.include_router(users.router, prefix="/api")
 
 @app.get("/")
 def read_root(request: Request):
+    """
+    Кореневий маршрут API.
+
+    Використовується для перевірки доступності сервера.
+    Повертає просте вітальне повідомлення.
+
+    Args:
+        request (Request): Поточний HTTP-запит.
+
+    Returns:
+        dict: Повідомлення з версією застосунку.
+    """
     return {"message": "Contacts Application v1.1"}
 
 

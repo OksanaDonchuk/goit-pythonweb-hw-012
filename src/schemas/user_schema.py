@@ -6,6 +6,16 @@ from src.entity.models import UserRole
 
 
 class UserBase(BaseModel):
+    """
+    Базова схема користувача.
+
+    Використовується як основа для інших схем (створення та відповіді).
+    Містить поля username та email з базовою валідацією.
+
+    Attributes:
+        username (str): Унікальне ім'я користувача.
+        email (EmailStr): Унікальна електронна пошта користувача.
+    """
 
     username: str = Field(
         min_length=constants.USERNAME_MIN_LENGTH,
@@ -24,6 +34,15 @@ class UserBase(BaseModel):
 
 
 class UserCreate(UserBase):
+    """
+    Схема створення користувача.
+
+    Використовується для реєстрації нового користувача.
+
+    Attributes:
+        password (str): Пароль користувача. Мінімальна та максимальна довжина
+            визначені у константах.
+    """
 
     password: str = Field(
         min_length=constants.USER_PASSWORD_MIN_LENGTH,
@@ -33,6 +52,17 @@ class UserCreate(UserBase):
 
 
 class UserResponse(UserBase):
+    """
+    Схема відповіді користувача.
+
+    Використовується у відповідях API після автентифікації або
+    при отриманні інформації про користувача.
+
+    Attributes:
+        id (int): Унікальний ідентифікатор користувача.
+        avatar (str | None): Посилання на аватар користувача, якщо встановлено.
+        role (UserRole): Роль користувача (USER, MODERATOR або ADMIN).
+    """
 
     id: int
     avatar: str | None

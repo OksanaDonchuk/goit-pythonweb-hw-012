@@ -9,15 +9,15 @@ from src.conf.config import settings
 
 def create_email_token(data: dict, expires_delta: timedelta | None = None) -> str:
     """
-    Створює JWT токен для email операцій (підтвердження/скидання паролю).
+    Створює JWT-токен для email-операцій (наприклад, підтвердження пошти або скидання паролю).
 
     Args:
-        data (dict): Дані для кодування (наприклад {"sub": email}).
+        data (dict): Дані для кодування (наприклад, {"sub": email}).
         expires_delta (timedelta, optional): Час життя токена.
             Якщо не передано — використовується 7 днів.
 
     Returns:
-        str: JWT токен
+        str: Згенерований JWT-токен.
     """
     to_encode = data.copy()
     expire = datetime.now(timezone.utc) + (expires_delta or timedelta(days=7))
@@ -28,16 +28,16 @@ def create_email_token(data: dict, expires_delta: timedelta | None = None) -> st
 
 def get_email_from_token(token: str) -> str:
     """
-    Декодує JWT токен та отримує email користувача.
+    Декодує JWT-токен і отримує email користувача з payload.
 
     Args:
-        token (str): JWT токен
+        token (str): JWT-токен, отриманий у листі.
 
     Returns:
-        str: Email з поля "sub"
+        str: Email із поля ``sub``.
 
     Raises:
-        HTTPException: Якщо токен недійсний.
+        HTTPException: Якщо токен недійсний або прострочений.
     """
     try:
         payload = jwt.decode(

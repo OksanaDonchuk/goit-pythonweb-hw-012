@@ -23,14 +23,36 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
 
 
 class AuthService:
+    """
+    Сервіс автентифікації та авторизації користувачів.
+
+    Виконує:
+    - реєстрацію та автентифікацію користувачів;
+    - створення, перевірку та відкликання access/refresh токенів;
+    - роботу з Redis для кешування користувачів та блокування токенів.
+    """
 
     def __init__(self, db: AsyncSession):
+        """
+        Ініціалізує сервіс автентифікації.
+
+        Args:
+            db (AsyncSession): Асинхронна сесія бази даних.
+        """
         self.db = db
         self.user_repository = UserRepository(self.db)
         self.refresh_token_repository = RefreshTokenRepository(self.db)
 
     def _hash_password(self, password: str) -> str:
+        """
+        Хешує пароль за допомогою bcrypt.
 
+        Args:
+            password (str): Звичайний пароль.
+
+        Returns:
+            str: Хешований пароль.
+        """
         salt = bcrypt.gensalt()
         hashed_password = bcrypt.hashpw(password.encode(), salt)
         return hashed_password.decode()
@@ -38,14 +60,44 @@ class AuthService:
     def _verify_password(
         self, plain_password: str, hashed_password: str
     ) -> bool:  # noqa
+        """
+        Перевіряє, чи співпадає звичайний пароль з хешем.
 
+        Args:
+            plain_password (str): Звичайний пароль.
+            hashed_password (str): Хеш пароля.
+
+        Returns:
+            bool: True, якщо паролі збігаються.
+        """
         return bcrypt.checkpw(plain_password.encode(), hashed_password.encode())
 
     def _hash_token(self, token: str):  # noqa
+        """
+        Хешує токен через SHA-256.
+
+        Args:
+            token (str): Значення токена.
+
+        Returns:
+            str: Хеш токена.
+        """
         return hashlib.sha256(token.encode()).hexdigest()
 
     async def authenticate(self, username: str, password: str) -> User:
+        """
+        Перевіряє дані користувача для входу.
 
+        Args:
+            username (str): Логін користувача.
+            password (str): Пароль.
+
+        Raises:
+            HTTPException(401): Якщо користувача не знайдено, пошта не підтверджена або пароль невірний.
+
+        Returns:
+            User: Об'єкт користувача.
+        """
         user = await self.user_repository.get_by_username(username)
         if not user:
             raise HTTPException(
@@ -68,7 +120,22 @@ class AuthService:
         return user
 
     async def register_user(self, user_data: UserCreate) -> User:
+        """
+        Реєструє нового користувача.
 
+        - Перевіряє унікальність username та email.
+        - Генерує аватар через Gravatar (якщо доступно).
+        - Хешує пароль і створює запис у БД.
+
+        Args:
+            user_data (UserCreate): Дані користувача.
+
+        Raises:
+            HTTPException(409): Якщо username або email вже зайняті.
+
+        Returns:
+            User: Створений користувач.
+        """
         if await self.user_repository.get_by_username(user_data.username):
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
@@ -95,7 +162,15 @@ class AuthService:
         return user
 
     def create_access_token(self, username: str) -> str:
+        """
+        Створює access-токен JWT.
 
+        Args:
+            username (str): Ім’я користувача.
+
+        Returns:
+            str: Access-токен.
+        """
         expires_delta = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
         expire = datetime.now(timezone.utc) + expires_delta
 
@@ -108,7 +183,17 @@ class AuthService:
     async def create_refresh_token(
         self, user_id: int, ip_address: str | None, user_agent: str | None
     ) -> str:
+        """
+        Створює refresh-токен і зберігає його у базі.
 
+        Args:
+            user_id (int): ID користувача.
+            ip_address (str | None): IP-адреса клієнта.
+            user_agent (str | None): User-Agent клієнта.
+
+        Returns:
+            str: Значення refresh-токена.
+        """
         token = secrets.token_urlsafe(32)
         token_hash = self._hash_token(token)
         expired_at = datetime.now(timezone.utc) + timedelta(
@@ -120,7 +205,18 @@ class AuthService:
         return token
 
     def decode_and_validate_access_token(self, token: str) -> dict:
+        """
+        Декодує та перевіряє access-токен.
 
+        Args:
+            token (str): Access-токен.
+
+        Raises:
+            HTTPException(401): Якщо токен недійсний.
+
+        Returns:
+            dict: Payload токена.
+        """
         try:
             payload = jwt.decode(
                 token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM]
@@ -135,6 +231,22 @@ class AuthService:
     async def get_current_user(
         self, token: str = Depends(oauth2_scheme)
     ) -> UserResponse:
+        """
+        Отримує поточного користувача на основі access-токена.
+
+        - Перевіряє, чи токен не відкликано (через Redis).
+        - Якщо дані є у кеші Redis — повертає їх.
+        - Інакше бере користувача з БД і кешує у Redis.
+
+        Args:
+            token (str): Access-токен.
+
+        Raises:
+            HTTPException(401): Якщо токен відкликано або користувача не знайдено.
+
+        Returns:
+            UserResponse: Дані користувача.
+        """
         if await redis_client.exists(f"bl:{token}"):
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
@@ -166,7 +278,18 @@ class AuthService:
         return UserResponse(**user_data)
 
     async def validate_refresh_token(self, token: str) -> User:
+        """
+        Валідовує refresh-токен.
 
+        Args:
+            token (str): Refresh-токен.
+
+        Raises:
+            HTTPException(401): Якщо токен невалідний або користувача не знайдено.
+
+        Returns:
+            User: Користувач, якому належить токен.
+        """
         token_hash = self._hash_token(token)
         current_time = datetime.now(timezone.utc)
         refresh_token = await self.refresh_token_repository.get_active_token(
@@ -186,7 +309,12 @@ class AuthService:
         return user
 
     async def revoke_refresh_token(self, token: str) -> None:
+        """
+        Відкликає refresh-токен.
 
+        Args:
+            token (str): Refresh-токен.
+        """
         token_hash = self._hash_token(token)
         refresh_token = await self.refresh_token_repository.get_by_token_hash(
             token_hash
@@ -197,7 +325,12 @@ class AuthService:
         return None
 
     async def revoke_access_token(self, token: str) -> None:
+        """
+        Відкликає access-токен (зберігає його у чорному списку Redis).
 
+        Args:
+            token (str): Access-токен.
+        """
         payload = self.decode_and_validate_access_token(token)
         exp = payload.get("exp")
         if exp:
