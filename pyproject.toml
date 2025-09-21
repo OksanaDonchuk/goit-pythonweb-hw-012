@@ -20,7 +20,10 @@ dependencies = [
     "apscheduler (>=3.11.0,<4.0.0)",
     "fastapi-mail (>=1.5.0,<2.0.0)",
     "libgravatar (>=1.0.4,<2.0.0)",
-    "cloudinary (>=1.44.1,<2.0.0)"
+    "cloudinary (>=1.44.1,<2.0.0)",
+    "pytest (>=8.4.2,<9.0.0)",
+    "pytest-asyncio (>=1.2.0,<2.0.0)",
+    "pytest-cov (>=7.0.0,<8.0.0)"
 ]
 
 
@@ -31,4 +34,8 @@ build-backend = "poetry.core.masonry.api"
 [tool.poetry.group.dev.dependencies]
 black = "^25.1.0"
 sphinx = "^8.2.3"
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+
 
