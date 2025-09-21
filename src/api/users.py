@@ -16,7 +16,6 @@ from src.conf.config import settings
 from src.core.depend_service import (
     get_auth_service,
     get_user_service,
-    get_current_user,
     get_current_admin_user,
 )
 from src.core.email_token import get_email_from_token
@@ -214,7 +213,7 @@ async def reset_password(
     Скидає пароль користувача.
 
     Args:
-        body (ResetPasswordSchema): Об’єкт із токеном скидання паролю та новим паролем.
+        body (ResetPasswordSchema): Об’єкт із токеном скидання пароля та новим паролем.
         user_service (UserService): Сервіс для роботи з користувачами.
 
     Returns:
