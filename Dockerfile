@@ -18,6 +18,8 @@ RUN pip install --no-cache-dir "poetry==$POETRY_VERSION"
 # Копіюємо тільки файли залежностей
 COPY pyproject.toml poetry.lock* ./
 
+RUN pip install --no-cache-dir "poetry==2.1.1"
+
 # Встановлюємо залежності
 RUN poetry install --no-root --no-ansi
 
